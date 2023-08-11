@@ -1,5 +1,7 @@
 CC = cc
-CFLAGS = -g
+CFLAGS = -Wall -Wextra -Wpedantic -Werror \
+         -O3 -march=native -mtune=native \
+         -fomit-frame-pointer -pipe
 LDLIBS = -luriparser -lssl -lcrypto
 
 all: totp
