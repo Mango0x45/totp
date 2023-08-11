@@ -49,7 +49,7 @@ b32toa(char *dst, const char *src, size_t len)
 		dst[i * 5 / 8 + 1] = (vs[1] << 6) | (vs[2] << 1) | (vs[3] >> 4);
 		dst[i * 5 / 8 + 2] = (vs[3] << 4) | (vs[4] >> 1);
 		dst[i * 5 / 8 + 3] = (vs[4] << 7) | (vs[5] << 2) | (vs[6] >> 3);
-		dst[i * 5 / 8 + 4] = (vs[6] << 5) |  vs[7];
+		dst[i * 5 / 8 + 4] = (vs[6] << 5) | (vs[7] >> 0);
 	}
 
 	return true;
