@@ -161,7 +161,8 @@ uri_parse(struct totp_config *conf, const char *uri_raw)
 		if (STREQ(p->key, "secret")) {
 			if (p->value == NULL)
 				WARNX_AND_RET("Secret key has no value");
-			conf->enc_sec = p->value;
+			if ((conf->enc_sec = strdup(p->value)) == NULL)
+				err(EXIT_FAILURE, "strdup");
 		} else if (STREQ(p->key, "digits")) {
 			if (p->value == NULL)
 				WARNX_AND_RET(empty_param, "digits");
@@ -225,8 +226,9 @@ totp(struct totp_config conf, uint32_t *code)
              | (mac[off + 1] & 0xFF) << 16
              | (mac[off + 2] & 0xFF) <<  8
              | (mac[off + 3] & 0xFF) <<  0;
-
 	*code = binc % pow32(10, conf.len);
+
+	free(key);
 	return true;
 }
 
