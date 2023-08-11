@@ -17,7 +17,6 @@
 #include "b32.h"
 
 #define STREQ(x, y) (strcmp(x, y) == 0)
-#define PRINT_CODE(w, x) printf("%0*d\n", (int)w, x)
 #define WARNX_AND_RET(...) \
 	do { \
 		rv = EXIT_FAILURE; \
@@ -46,6 +45,7 @@ static const char *usage_s =
 	"       %s [-u] [uri ...]\n";
 
 static void      usage(void);
+static void      totp_print(struct totp_config, char *, bool);
 static bool      strtol_safe(long *, const char *);
 static bool      totp(struct totp_config, uint32_t *);
 static uint32_t  pow32(uint32_t, uint32_t);
@@ -67,7 +67,6 @@ main(int argc, char *argv[])
 	char *buf;
 	size_t bufsiz;
 	ssize_t nr;
-	uint32_t code;
 	struct totp_config conf = TOTP_DEFAULT;
 	struct option longopts[] = {
 		{"digits", required_argument, 0, 'd'},
@@ -99,20 +98,6 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	for (int i = 0; i < argc; i++) {
-		conf.enc_sec = argv[i];
-		if (uflag) {
-			conf = TOTP_DEFAULT;
-			if (!uri_parse(&conf, argv[i])) {
-				rv = EXIT_FAILURE;
-				continue;
-			}
-		} else
-			conf.enc_sec = argv[i];
-		if (totp(conf, &code))
-			PRINT_CODE(conf.len, code);
-	}
-
 	if (argc == 0) {
 		buf = NULL;
 		bufsiz = 0;
@@ -120,20 +105,30 @@ main(int argc, char *argv[])
 		while ((nr = getline(&buf, &bufsiz, stdin)) > 0) {
 			if (buf[--nr] == '\n')
 				buf[nr] = '\0';
-			if (uflag) {
-				conf = TOTP_DEFAULT;
-				if (!uri_parse(&conf, buf)) {
-					rv = EXIT_FAILURE;
-					continue;
-				}
-			} else
-				conf.enc_sec = buf;
-			if (totp(conf, &code))
-				PRINT_CODE(conf.len, code);
+			totp_print(conf, buf, uflag);
 		}
-	}
+		free(buf);
+	} else for (int i = 0; i < argc; i++)
+		totp_print(conf, argv[i], uflag);
 
 	return rv;
+}
+
+void
+totp_print(struct totp_config conf, char *buf, bool uflag)
+{
+	uint32_t code;
+	
+	if (uflag) {
+		conf = TOTP_DEFAULT;
+		if (!uri_parse(&conf, buf))
+			return;
+	} else
+		conf.enc_sec = buf;
+	if (totp(conf, &code))
+		printf("%0*d\n", (int)conf.len, code);
+	if (uflag)
+		free((void *)conf.enc_sec);
 }
 
 bool
