@@ -25,7 +25,7 @@ bool
 b32toa(char *dst, const char *src, size_t len)
 {
 	char c;
-	int pad = 0;
+	size_t pad = 0;
 	uint8_t vs[8];
 
 	while (src[len - 1 - pad] == '=') {
