@@ -38,11 +38,10 @@ b32toa(char *dst, const char *src, size_t len)
 			c = src[i + j];
 			vs[j] = ctov[(uint8_t)c];
 			if (vs[j] == 255) {
-				if (c == '=' && j >= 8 - pad) {
+				if (c == '=' && j >= 8 - pad)
 					vs[j] = 0;
-				} else {
+				else
 					return false;
-				}
 			}
 		}
 
