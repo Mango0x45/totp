@@ -16,10 +16,14 @@
 
 #include "b32.h"
 
-#define DIE(...) err(EXIT_FAILURE, __VA_ARGS__)
-#define DIEX(...) errx(EXIT_FAILURE, __VA_ARGS__)
 #define STREQ(x, y) (strcmp(x, y) == 0)
 #define PRINT_CODE(w, x) printf("%0*d\n", (int)w, x)
+#define WARNX_AND_RET(...) \
+	do { \
+		rv = EXIT_FAILURE; \
+		warnx(__VA_ARGS__); \
+		return false; \
+	} while (false)
 
 #define TOTP_DEFAULT (struct totp_config){ .len = 6, .p = 30 }
 
@@ -31,6 +35,8 @@ struct totp_config {
 };
 
 extern char *__progname;
+
+static int rv;
 
 static const char *bad_scheme = "Invalid scheme ‘%.*s’; expected ‘otpauth’";
 static const char *bad_param = "Invalid ‘%s’ parameter provided";
@@ -55,7 +61,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	int opt, rv;
+	int opt;
 	bool uflag = false;
 	long n;
 	char *buf;
@@ -75,7 +81,8 @@ main(int argc, char *argv[])
 		case 'd':
 		case 'p':
 			if (!strtol_safe(&n, optarg))
-				DIEX(bad_param, opt == 'd' ? "digits" : "period");
+				errx(EXIT_FAILURE, bad_param,
+				     opt == 'd' ? "digits" : "period");
 			if (opt == 'd')
 				conf.len = n;
 			else
@@ -91,8 +98,6 @@ main(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
-
-	rv = EXIT_SUCCESS;
 
 	for (int i = 0; i < argc; i++) {
 		conf.enc_sec = argv[i];
@@ -142,52 +147,37 @@ uri_parse(struct totp_config *conf, const char *uri_raw)
 	const char *epos;
 
 	if ((n = uriParseSingleUriA(&uri, uri_raw, &epos)) != URI_SUCCESS) {
-		len = epos - uri_raw;
-		warnx("Failed to parse URI ‘%s’\n"
-		      "%*c Error detected here",
-		      uri_raw, (int)(len + 24 + strlen(__progname)), '^');
-		return false;
+		len = epos - uri_raw + 24 + strlen(__progname);
+		WARNX_AND_RET("Failed to parse URI ‘%s’\n"
+		              "%*c Error detected here",
+		              uri_raw, (int)len, '^');
 	}
 
 	len = uri.scheme.afterLast - uri.scheme.first;
 	reject = len != strlen("otpauth");
 	reject = reject || strncasecmp(uri.scheme.first, "otpauth", len) != 0;
 
-	if (reject) {
-		warnx(bad_scheme, (int)len, uri.scheme.first);
-		return false;
-	}
+	if (reject)
+		WARNX_AND_RET(bad_scheme, (int)len, uri.scheme.first);
 	if (uriDissectQueryMallocA(&qs, NULL, uri.query.first,
-	                           uri.query.afterLast) != URI_SUCCESS) {
-		warnx("Failed to parse query string");
-		return false;
-	}
+	                           uri.query.afterLast) != URI_SUCCESS)
+		WARNX_AND_RET("Failed to parse query string");
 
 	for (UriQueryListA *p = qs; p != NULL; p = p->next) {
 		if (STREQ(p->key, "secret")) {
-			if (p->value == NULL) {
-				warnx("Secret key has no value");
-				return false;
-			}
+			if (p->value == NULL)
+				WARNX_AND_RET("Secret key has no value");
 			conf->enc_sec = p->value;
 		} else if (STREQ(p->key, "digits")) {
-			if (p->value == NULL) {
-				warnx(empty_param, "digits");
-				return false;
-			}
-			if (!strtol_safe(&conf->len, p->value)) {
-				warnx(bad_param, "digits");
-				return false;
-			}
+			if (p->value == NULL)
+				WARNX_AND_RET(empty_param, "digits");
+			if (!strtol_safe(&conf->len, p->value))
+				WARNX_AND_RET(bad_param, "digits");
 		} else if (STREQ(p->key, "period")) {
-			if (p->value == NULL) {
-				warnx(empty_param, "period");
-				return false;
-			}
-			if (!strtol_safe(&conf->p, p->value)) {
-				warnx(bad_param, "period");
-				return false;
-			}
+			if (p->value == NULL)
+				WARNX_AND_RET(empty_param, "period");
+			if (!strtol_safe(&conf->p, p->value))
+				WARNX_AND_RET(bad_param, "period");
 		}
 	}
 
@@ -215,8 +205,10 @@ totp(struct totp_config conf, uint32_t *code)
 	key = calloc(keylen, sizeof(char));
 	b32toa(key, conf.enc_sec, strlen(conf.enc_sec));
 
-	if (time(&epoch) == (time_t)-1)
-		DIE("time");
+	if (time(&epoch) == (time_t)-1) {
+		warn("time");
+		return false;
+	}
 
 	epoch /= conf.p;
 
@@ -231,7 +223,7 @@ totp(struct totp_config conf, uint32_t *code)
 	
 	mac = HMAC(EVP_sha1(), key, keylen, buf, sizeof(buf), NULL, NULL);
 	if (mac == NULL)
-		return false;
+		WARNX_AND_RET("Failed to compute HMAC SHA-1 hash");
 
         /* SHA1 hashes are 20 bytes long */
 	off = mac[19] & 0x0F;
