@@ -139,14 +139,13 @@ main(int argc, char *argv[])
 bool
 uri_parse(struct totp_config *conf, const char *uri_raw)
 {
-	int n;
 	bool reject;
 	size_t len;
 	UriUriA uri;
 	UriQueryListA *qs;
 	const char *epos;
 
-	if ((n = uriParseSingleUriA(&uri, uri_raw, &epos)) != URI_SUCCESS) {
+	if (uriParseSingleUriA(&uri, uri_raw, &epos) != URI_SUCCESS) {
 		len = epos - uri_raw + 24 + strlen(__progname);
 		WARNX_AND_RET("Failed to parse URI ‘%s’\n"
 		              "%*c Error detected here",
