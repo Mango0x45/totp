@@ -233,7 +233,6 @@ totp(struct totp_config conf, uint32_t *code)
 
         /* SHA1 hashes are 20 bytes long */
 	off = mac[19] & 0x0F;
-	printf("%d\n", off);
 	binc = (mac[off + 0] & 0x7F) << 24
              | (mac[off + 1] & 0xFF) << 16
              | (mac[off + 2] & 0xFF) <<  8
