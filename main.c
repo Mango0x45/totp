@@ -186,7 +186,7 @@ bool
 totp(struct totp_config conf, uint32_t *code)
 {
 	int off;
-	char *key;
+	uint8_t *key;
 	uchar *mac;
 	time_t epoch;
 	size_t keylen;

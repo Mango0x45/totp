@@ -22,7 +22,7 @@ static const uint8_t ctov[] = {
 };
 
 bool
-b32toa(char *dst, const char *src, size_t len)
+b32toa(uint8_t *dst, const char *src, size_t len)
 {
 	char c;
 	size_t pad = 0;
@@ -37,7 +37,7 @@ b32toa(char *dst, const char *src, size_t len)
 		for (size_t j = 0; j < 8; j++) {
 			c = src[i + j];
 			vs[j] = ctov[(uint8_t)c];
-			if (vs[j] == 255) {
+			if (vs[j] == (uint8_t)-1) {
 				if (c == '=' && j >= 8 - pad)
 					vs[j] = 0;
 				else
