@@ -50,6 +50,7 @@ static bool     strtol_safe(long *, const char *);
 static bool     totp(struct totp_config, uint32_t *);
 static uint32_t pow32(uint32_t, uint32_t);
 static bool     uri_parse(struct totp_config *, const char *);
+static bool     big_endian(void);
 
 void
 usage(void)
@@ -191,9 +192,9 @@ totp(struct totp_config conf, uint32_t *code)
 	char *enc_sec;
 	uchar *mac;
 	time_t epoch;
-	size_t keylen, enc_sec_len, old;
-	uint8_t buf[sizeof(time_t)];  /* Enough for a 64bit num */
+	uint8_t buf[sizeof(time_t)];
 	uint32_t binc;
+	size_t keylen, enc_sec_len, old;
 	
 	/* conf.enc_sec needs to be ‘=’ padded to a multiple of 8 */
 	old = enc_sec_len = strlen(conf.enc_sec);
@@ -219,14 +220,12 @@ totp(struct totp_config conf, uint32_t *code)
 
 	epoch /= conf.p;
 
-	buf[0] = (epoch >> 56) & 0xFF;
-	buf[1] = (epoch >> 48) & 0xFF;
-	buf[2] = (epoch >> 40) & 0xFF;
-	buf[3] = (epoch >> 32) & 0xFF;
-	buf[4] = (epoch >> 24) & 0xFF;
-	buf[5] = (epoch >> 16) & 0xFF;
-	buf[6] = (epoch >>  8) & 0xFF;
-	buf[7] = (epoch >>  0) & 0xFF;
+	if (big_endian())
+		memcpy(buf, &epoch, sizeof(time_t));
+	else {
+		for (size_t i = 0; i < sizeof(buf); i++)
+			buf[i] = (epoch >> (8 * (sizeof(buf) - 1 - i))) & 0xFF;
+	}
 
 	mac = HMAC(EVP_sha1(), key, keylen, buf, sizeof(buf), NULL, NULL);
 	if (mac == NULL)
@@ -234,6 +233,7 @@ totp(struct totp_config conf, uint32_t *code)
 
         /* SHA1 hashes are 20 bytes long */
 	off = mac[19] & 0x0F;
+	printf("%d\n", off);
 	binc = (mac[off + 0] & 0x7F) << 24
              | (mac[off + 1] & 0xFF) << 16
              | (mac[off + 2] & 0xFF) <<  8
@@ -264,4 +264,13 @@ pow32(uint32_t x, uint32_t y)
 	while (--y != 0)
 		x *= n;
 	return x;
+}
+
+bool
+big_endian(void)
+{
+	unsigned n = 0x01020304;
+	uchar *ptr = (uchar *)&n;
+
+	return *ptr == 1;
 }
