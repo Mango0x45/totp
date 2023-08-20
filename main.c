@@ -203,14 +203,16 @@ totp(struct totp_config conf, uint32_t *code)
 		clean = false;
 	} else {
 		enc_sec_len += 8 - enc_sec_len % 8;
-		enc_sec = malloc(enc_sec_len);
+		if ((enc_sec = malloc(enc_sec_len)) == NULL)
+			err(EXIT_FAILURE, "malloc");
 		memcpy(enc_sec, conf.enc_sec, old);
 		memset(enc_sec + old, '=', enc_sec_len - old);
 		clean = true;
 	}
 
-	keylen = old * 5 / 8;
-	key = calloc(keylen, sizeof(char));
+	keylen = old / 1.6;
+	if ((key = calloc(keylen + 1, sizeof(char))) == NULL)
+		err(EXIT_FAILURE, "calloc");
 	b32toa(key, enc_sec, enc_sec_len);
 
 	if (time(&epoch) == (time_t)-1) {
