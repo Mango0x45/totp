@@ -42,7 +42,7 @@ static const char *bad_param = "Invalid ‘%s’ parameter provided";
 static const char *empty_param = "Empty ‘%s’ parameter provided";
 static const char *usage_s =
 	"Usage: %s [-d digits] [-p period] [secret ...]\n"
-	"       %s [-u] [uri ...]\n";
+	"       %s -u [uri ...]\n";
 
 static void     usage(void);
 static void     totp_print(struct totp_config, char *, bool);
