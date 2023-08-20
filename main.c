@@ -44,12 +44,12 @@ static const char *usage_s =
 	"Usage: %s [-d digits] [-p period] [secret ...]\n"
 	"       %s [-u] [uri ...]\n";
 
-static void      usage(void);
-static void      totp_print(struct totp_config, char *, bool);
-static bool      strtol_safe(long *, const char *);
-static bool      totp(struct totp_config, uint32_t *);
-static uint32_t  pow32(uint32_t, uint32_t);
-static bool      uri_parse(struct totp_config *, const char *);
+static void     usage(void);
+static void     totp_print(struct totp_config, char *, bool);
+static bool     strtol_safe(long *, const char *);
+static bool     totp(struct totp_config, uint32_t *);
+static uint32_t pow32(uint32_t, uint32_t);
+static bool     uri_parse(struct totp_config *, const char *);
 
 void
 usage(void)
