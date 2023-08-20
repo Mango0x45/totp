@@ -186,19 +186,31 @@ bool
 totp(struct totp_config conf, uint32_t *code)
 {
 	int off;
+	bool clean;
 	uint8_t *key;
+	char *enc_sec;
 	uchar *mac;
 	time_t epoch;
-	size_t keylen;
+	size_t keylen, enc_sec_len, old;
 	uint8_t buf[sizeof(time_t)];  /* Enough for a 64bit num */
 	uint32_t binc;
 	
-	/* TODO: conf.enc_sec needs to be ‘=’ padded to a multiple of 8 */
+	/* conf.enc_sec needs to be ‘=’ padded to a multiple of 8 */
+	old = enc_sec_len = strlen(conf.enc_sec);
+	if (enc_sec_len % 8 == 0) {
+		enc_sec = (char *)conf.enc_sec;
+		clean = false;
+	} else {
+		enc_sec_len += 8 - enc_sec_len % 8;
+		enc_sec = malloc(enc_sec_len);
+		memcpy(enc_sec, conf.enc_sec, old);
+		memset(enc_sec + old, '=', enc_sec_len - old);
+		clean = true;
+	}
 
-	/* When decoding base32, you need ceil(conf.enc_sec / 1.6) bytes */
-	keylen = strlen(conf.enc_sec) / 1.6 + 1;
+	keylen = old * 5 / 8;
 	key = calloc(keylen, sizeof(char));
-	b32toa(key, conf.enc_sec, strlen(conf.enc_sec));
+	b32toa(key, enc_sec, enc_sec_len);
 
 	if (time(&epoch) == (time_t)-1) {
 		warn("time");
@@ -215,7 +227,7 @@ totp(struct totp_config conf, uint32_t *code)
 	buf[5] = (epoch >> 16) & 0xFF;
 	buf[6] = (epoch >>  8) & 0xFF;
 	buf[7] = (epoch >>  0) & 0xFF;
-	
+
 	mac = HMAC(EVP_sha1(), key, keylen, buf, sizeof(buf), NULL, NULL);
 	if (mac == NULL)
 		WARNX_AND_RET("Failed to compute HMAC SHA-1 hash");
@@ -228,6 +240,8 @@ totp(struct totp_config conf, uint32_t *code)
              | (mac[off + 3] & 0xFF) <<  0;
 	*code = binc % pow32(10, conf.len);
 
+	if (clean)
+		free(enc_sec);
 	free(key);
 	return true;
 }
