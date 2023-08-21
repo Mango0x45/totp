@@ -1,0 +1,77 @@
+.Dd $Mdocdate: August 21 2023 $
+.Dt TOTP 1
+.Os
+.Sh NAME
+.Nm totp
+.Nd generate TOTP codes
+.Sh SYNOPSIS
+.Nm
+.Op Fl d Ar digits
+.Op Fl p Ar period
+.Op Fl u
+.Op Ar secret ...
+.Sh DESCRIPTION
+.Nm
+is a utility to generate TOTP codes on the command\-line.
+You can provide TOTP secret codes either through the standard input or as
+command\-line.
+If you would like to use OTP URIs instead, those are also supported through the
+.Fl u
+option, which enables URI parsing of inputs.
+.Pp
+When working with OTP URIs, metadata regarding the digit length or the duration
+period of TOTP codes is typically contained within the URI, and
+.Nm
+parses and interprets that information for you.
+This is not the case when using raw TOTP secret codes.
+When using TOTP secret codes, it is assumed that TOTP codes are 6 digits long
+with a duration of 30 seconds.
+If you need different defaults you can make use of the
+.Fl d
+and
+.Fl p
+flags.
+.Pp
+The options are as follows:
+.Bl -tag width Ds
+.It Fl d , Fl Fl digits Ns = Ns Ar length
+Set the digit length of TOTP codes to
+.Ar length .
+If this flag is not specified, the digit length defaults to 6 digits.
+.It Fl p , Fl Fl period Ns = Ns Ar seconds
+Set the duration period of TOTP codes to
+.Ar seconds .
+If this flag is not specified, the duration period defaults to 30 seconds.
+.It Fl u , Fl Fl uri
+Interpret input as OTP URIs instead of raw TOTP secret keys.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Get TOTP codes for two different secret keys using the standard input:
+.Pp
+.Dl $ printf '7KFSJ562KJDK23KD\en7YNEG7J3XBIVYR54' | totp
+.Pp
+The same as the above but using command\-line arguments:
+.Pp
+.Dl $ totp 7KFSJ562KJDK23KD 7YNEG7J3XBIVYR54
+.Pp
+Get a TOTP code for an OTP URI:
+.Pp
+.Dl $ totp -u 'otpauth://totp/GitHub:Mango0x45?secret=7YNEG7J3XBIVYR54'
+.Pp
+The same as above, but extract the URI from a QR\-code using
+.Xr zbarimg 1 :
+.Pp
+.Dl $ zbarimg -q qr.png | sed 's/QR-Code://' | totp -u
+.Pp
+Generate an 8 digit TOTP code that is valid for 60 seconds:
+.Pp
+.Dl $ totp -d8 -p60 7KFSJ562KJDK23KD
+.Sh SEE ALSO
+.Xr sed 1 ,
+.Xr zbarimg 1 ,
+.Xr HMAC 3ssl ,
+.Xr SHA1 3ssl
+.Sh AUTHORS
+.An Thomas Voss Aq Mt mail@thomasvoss.com
