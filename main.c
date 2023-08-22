@@ -54,7 +54,7 @@ static bool     big_endian(void);
 void
 usage(void)
 {
-	fprintf(stderr, usage_s, __progname, __progname);
+	fprintf(stderr, usage_s, __progname);
 	exit(EXIT_FAILURE);
 }
 
