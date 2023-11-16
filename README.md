@@ -6,6 +6,13 @@ existing password-management setup.  `totp` supports both TOTP secret keys and
 OTP URIs as input.  This means you can also integrate `totp` together with
 `zbarimg` to generate TOTP codes from scannable QR codes.
 
+## Depdendencies
+
+`totp` depends on libssl, libcrypto, and liburiparser.  You probably already
+have the first two.  If liburiparser isn’t in your systems repositories, you can
+obtain it from [here][1]
+
+
 ## Installation
 
 Installation is made easy with the provided Makefile:
@@ -57,3 +64,6 @@ code.  Here is an example of how we can use it to generate a TOTP code from a
 
     $ zbarimg -q qr-code.png | sed 's/QR-Code://' | totp
     546316
+
+
+[1]: https://github.com/uriparser/uriparser
