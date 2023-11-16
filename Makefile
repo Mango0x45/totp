@@ -1,3 +1,5 @@
+.POSIX:
+
 CC = cc
 CFLAGS = \
 	-Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align \
@@ -15,10 +17,7 @@ totp: main.o b32.o
 	${CC} ${LDLIBS} -o $@ main.o b32.o
 
 main.o: main.c b32.h
-	${CC} ${CFLAGS} -c main.c
-
 b32.o: b32.c b32.h
-	${CC} ${CFLAGS} -c b32.c
 
 install:
 	mkdir -p ${DPREFIX}/bin ${DPREFIX}/share/man/man1
