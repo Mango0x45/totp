@@ -1,7 +1,10 @@
 CC = cc
-CFLAGS = -Wall -Wextra -Wpedantic -Werror \
-         -O3 -march=native -mtune=native \
-         -fomit-frame-pointer -pipe
+CFLAGS = \
+	-Wall -Wextra -pedantic -Wshadow -Wpointer-arith -Wcast-align \
+	-Wwrite-strings -Wmissing-prototypes -Wmissing-declarations \
+	-Wredundant-decls -Wnested-externs -Winline -Wno-long-long \
+	-Wconversion -Wstrict-prototypes \
+	-O3 -march=native -mtune=native -pipe
 LDLIBS = -luriparser -lssl -lcrypto
 
 PREFIX  = /usr/local

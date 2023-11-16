@@ -30,18 +30,17 @@ typedef unsigned char uchar;
 
 struct totp_config {
 	const char *enc_sec;
-	long len, p;
+	long        len, p;
 };
 
 extern char *__progname;
 
 static int rv;
 
-static const char *bad_scheme = "Invalid scheme ‘%.*s’; expected ‘otpauth’";
-static const char *bad_param = "Invalid ‘%s’ parameter provided";
+static const char *bad_scheme  = "Invalid scheme ‘%.*s’; expected ‘otpauth’";
+static const char *bad_param   = "Invalid ‘%s’ parameter provided";
 static const char *empty_param = "Empty ‘%s’ parameter provided";
-static const char *usage_s =
-	"Usage: %s [-d digits] [-p period] [-u] [secret ...]\n";
+static const char *usage_s     = "Usage: %s [-d digits] [-p period] [-u] [secret ...]\n";
 
 static void     usage(void);
 static void     totp_print(struct totp_config, char *, bool);
@@ -141,13 +140,13 @@ uri_parse(struct totp_config *conf, const char *uri_raw)
 	const char *epos;
 
 	if (uriParseSingleUriA(&uri, uri_raw, &epos) != URI_SUCCESS) {
-		len = epos - uri_raw + 24 + strlen(__progname);
+		len = (size_t)(epos - uri_raw) + 24 + strlen(__progname);
 		WARNX_AND_RET("Failed to parse URI ‘%s’\n"
 		              "%*c Error detected here",
 		              uri_raw, (int)len, '^');
 	}
 
-	len = uri.scheme.afterLast - uri.scheme.first;
+	len = (size_t)(uri.scheme.afterLast - uri.scheme.first);
 	reject = len != strlen("otpauth");
 	reject = reject || strncasecmp(uri.scheme.first, "otpauth", len) != 0;
 
@@ -209,7 +208,7 @@ totp(struct totp_config conf, uint32_t *code)
 		clean = true;
 	}
 
-	keylen = old / 1.6;
+	keylen = (size_t)((double)old / 1.6);
 	if ((key = calloc(keylen + 1, sizeof(char))) == NULL)
 		err(EXIT_FAILURE, "calloc");
 	b32toa(key, enc_sec, enc_sec_len);
@@ -223,12 +222,10 @@ totp(struct totp_config conf, uint32_t *code)
 
 	if (big_endian())
 		memcpy(buf, &epoch, sizeof(time_t));
-	else {
-		for (size_t i = 0; i < sizeof(buf); i++)
-			buf[i] = (epoch >> (8 * (sizeof(buf) - 1 - i))) & 0xFF;
-	}
+	else for (size_t i = sizeof(buf); i --> 0;)
+		buf[sizeof(buf)-1-i] = (uint8_t)((epoch >> 8 * i) & 0xFF);
 
-	mac = HMAC(EVP_sha1(), key, keylen, buf, sizeof(buf), NULL, NULL);
+	mac = HMAC(EVP_sha1(), key, (int)keylen, buf, sizeof(buf), NULL, NULL);
 	if (mac == NULL)
 		WARNX_AND_RET("Failed to compute HMAC SHA-1 hash");
 
@@ -238,7 +235,7 @@ totp(struct totp_config conf, uint32_t *code)
              | (mac[off + 1] & 0xFF) << 16
              | (mac[off + 2] & 0xFF) <<  8
              | (mac[off + 3] & 0xFF) <<  0;
-	*code = binc % pow32(10, conf.len);
+	*code = binc % pow32(10, (uint32_t)conf.len);
 
 	if (clean)
 		free(enc_sec);
@@ -258,7 +255,7 @@ strtol_safe(long *n, const char *s)
 uint32_t
 pow32(uint32_t x, uint32_t y)
 {
-	int n = x;
+	uint32_t n = x;
 	if (y == 0)
 		return 1;
 	while (--y != 0)

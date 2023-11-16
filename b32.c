@@ -2,6 +2,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "b32.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
 static const uint8_t ctov[] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -20,6 +24,7 @@ static const uint8_t ctov[] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
+#pragma GCC diagnostic pop
 
 bool
 b32toa(uint8_t *dst, const char *src, size_t len)
