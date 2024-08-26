@@ -188,8 +188,7 @@ bigendian(void)
 		uint16_t u16;
 		uint8_t  u8[2];
 	} u = {
-		.u16 = 0x0102,
+		.u16 = 0x0102U,
 	};
-	u.u16 = 0x0102U;
 	return u.u8[0] == 1;
 }
