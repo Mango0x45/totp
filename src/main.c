@@ -64,7 +64,6 @@ main(int argc, char **argv)
 			if (!xisdigit(optarg[0]))
 				errx(1, "%s: Invalid integer", optarg);
 
-			errno = 0;
 			char *endptr;
 			long n = strtol(optarg, &endptr, 10);
 
@@ -77,8 +76,8 @@ main(int argc, char **argv)
 			   LONG_MIN. */
 			if (n > INT_MAX)
 				errno = ERANGE;
-			if (errno == ERANGE)
 				err(1, "%s", optarg);
+			}
 
 			if (n == 0)
 				errx(1, "%s: Integer must be non-zero", optarg);
