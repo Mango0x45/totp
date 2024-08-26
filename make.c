@@ -13,7 +13,7 @@
 #define CBS_NO_THREADS
 #include "cbs.h"
 
-#define PREFIX "/usr"
+#define PREFIX "/usr/local"
 
 #define streq(x, y) (strcmp(x, y) == 0)
 #define CMDPRC(c)                                                              \
