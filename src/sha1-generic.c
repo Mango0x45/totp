@@ -74,8 +74,8 @@ rotl32(uint32_t x, uint8_t bits)
 #if (__GNUC__ || __TINYC__) && __x86_64__
 	__asm__ ("roll %1, %0" : "+r" (x) : "c" (bits) : "cc");
 	return x;
-#elif __GNUC__ && __aarch64__ /* TODO: Test this! */
-	__asm__ ("ror %0, %0, %1" : "+r" (x) : "c" (-bits));
+#elif __GNUC__ && __aarch64__
+	__asm__ ("ror %w0, %w0, %w1" : "+r" (x) : "r" (-bits));
 	return x;
 #else
 	return (x << bits) | (x >> (32 - bits));
