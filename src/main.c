@@ -23,8 +23,6 @@ static inline uint32_t pow32(uint32_t, uint32_t)
 	__attribute__((always_inline, const));
 static inline bool xisdigit(char)
 	__attribute__((always_inline, const));
-static inline bool bigendian(void)
-	__attribute__((always_inline, const));
 
 static int digits = 6, period = 30;
 
@@ -179,16 +177,4 @@ bool
 xisdigit(char ch)
 {
 	return ch >= '0' && ch <= '9';
-}
-
-bool
-bigendian(void)
-{
-	union {
-		uint16_t u16;
-		uint8_t  u8[2];
-	} u = {
-		.u16 = 0x0102U,
-	};
-	return u.u8[0] == 1;
 }
