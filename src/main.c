@@ -30,7 +30,7 @@ static noreturn void
 usage(const char *argv0)
 {
 	fprintf(stderr,
-		"Usage: %s [-d digits] [-p period] [secret]\n"
+		"Usage: %s [-d digits] [-p period] [secret ...]\n"
 		"       %s -h\n",
 		argv0, argv0);
 	exit(EXIT_FAILURE);
@@ -93,16 +93,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	switch (argc) {
-	case 0:
+	if (argc == 0)
 		process_stdin();
-		break;
-	case 1:
-		process(argv[0], strlen(argv[0]));
-		break;
-	default:
-		usage(argv[-optind]);
-	}
+	else for (int i = 0; i < argc; i++)
+		process(argv[i], strlen(argv[i]));
 
 	return EXIT_SUCCESS;
 }
