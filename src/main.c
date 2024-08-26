@@ -10,6 +10,7 @@
 #include <stdnoreturn.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "base32.h"
 #include "common.h"
@@ -51,9 +52,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, "d:hp:", longopts, NULL)) != -1) {
 		switch (opt) {
 		case 'h':
-			/* TODO: Open the manual page! */
-			usage(argv[0]);
-			break;
+			execlp("man", "man", "1", argv[0], NULL);
 		case 'd':
 		case 'p': {
 			/* strtol() allows for numbers with leading spaces and a
