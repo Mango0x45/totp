@@ -12,7 +12,7 @@ hmac_sha1(uint8_t *restrict out,
 {
 	uint8_t keyext[SHA1BLKSZ] = {0},
 	        keyipad[SHA1BLKSZ],
-			keyopad[SHA1BLKSZ];
+	        keyopad[SHA1BLKSZ];
 
 	if (keysz > SHA1BLKSZ) {
 		sha1_t sha;
