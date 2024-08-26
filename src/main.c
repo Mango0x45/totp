@@ -44,13 +44,18 @@ main(int argc, char **argv)
 	int opt;
 	static const struct option longopts[] = {
 		{"digits", required_argument, 0, 'd'},
+		{"help",   no_argument,       0, 'h'},
 		{"period", required_argument, 0, 'p'},
 		{0},
 	};
 
 	argv[0] = basename(argv[0]);
-	while ((opt = getopt_long(argc, argv, "d:p:", longopts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "d:hp:", longopts, NULL)) != -1) {
 		switch (opt) {
+		case 'h':
+			/* TODO: Open the manual page! */
+			usage(argv[0]);
+			break;
 		case 'd':
 		case 'p': {
 			/* strtol() allows for numbers with leading spaces and a
