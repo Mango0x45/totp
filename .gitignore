@@ -1,4 +1,5 @@
 totp
+totp-arm64
 totp-x64
 make
 *.o
