@@ -36,7 +36,6 @@ static char *cflags_dbg[] = {
 static char *cflags_rls[] = {
 	"-DNDEBUG=1",
 	"-flto",
-	"-fomit-frame-pointer",
 	"-march=native",
 	"-mtune=native",
 	"-O3",
