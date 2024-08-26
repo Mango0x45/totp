@@ -72,7 +72,7 @@ main(int argc, char **argv)
 			/* The number was too large.  We asserted that the input
 			   didn’t start with ‘-’ so we can ignore checking for
 			   LONG_MIN. */
-			if (n > INT_MAX)
+			if (n > INT_MAX) {
 				errno = ERANGE;
 				err(1, "%s", optarg);
 			}
