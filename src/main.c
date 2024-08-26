@@ -154,9 +154,9 @@ process(const char *s, size_t n)
 
 	int off = dgst[19] & 0x0F;
 	uint32_t binc = (dgst[off + 0] & 0x7F) << 24
-                  | (dgst[off + 1] & 0xFF) << 16
-                  | (dgst[off + 2] & 0xFF) <<  8
-                  | (dgst[off + 3] & 0xFF) <<  0;
+	              | (dgst[off + 1] & 0xFF) << 16
+	              | (dgst[off + 2] & 0xFF) <<  8
+	              | (dgst[off + 3] & 0xFF) <<  0;
 	printf("%0*" PRId32 "\n", digits, binc % pow32(10, digits));
 
 	if (key != _key)
