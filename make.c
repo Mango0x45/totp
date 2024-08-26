@@ -1,6 +1,10 @@
 #include <assert.h>
+#include <err.h>
+#include <errno.h>
 #include <getopt.h>
 #include <glob.h>
+#include <libgen.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,9 +13,23 @@
 #define CBS_NO_THREADS
 #include "cbs.h"
 
+#define PREFIX "/usr"
+
+#define streq(x, y) (strcmp(x, y) == 0)
+#define CMDPRC(c)                                                              \
+	do {                                                                       \
+		int ec;                                                                \
+		cmdput(c);                                                             \
+		if ((ec = cmdexec(c)) != EXIT_SUCCESS)                                 \
+			errx(1, "%s terminated with exit-code %d", *c.buf, ec);            \
+		strszero(&c);                                                          \
+	} while (false)
+
 static void cc(void *);
 static void ld(void);
-static int globerr(const char *, int);
+static char *mkoutpath(const char *);
+static char *xstrdup(const char *);
+static void *xmalloc(size_t);
 
 static char *warnings[] = {
 	"-Wall",
@@ -49,8 +67,8 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	        "Usage: %s [-p generic|arm64|x64] [-fSr]\n"
-	        "       %s clean\n",
+	        "Usage: %s [-p generic|arm64|x64] [-o outfile] [-fSr]\n"
+	        "       %s clean | install\n",
 	        argv0, argv0);
 	exit(EXIT_FAILURE);
 }
@@ -61,7 +79,7 @@ main(int argc, char **argv)
 	cbsinit(argc, argv);
 	rebuild();
 
-	argv0 = argv[0];
+	argv0 = basename(argv[0]);
 
 	int opt;
 	static const struct option longopts[] = {
@@ -85,20 +103,17 @@ main(int argc, char **argv)
 			Sflag = true;
 			break;
 		case 'o':
-			oflag = strdup(optarg);
-			assert(oflag != NULL);
+			oflag = xstrdup(optarg);
 			break;
 		case 'p':
-			if (strcmp(optarg, "generic") == 0
-			 || strcmp(optarg, "arm64")   == 0
-			 || strcmp(optarg, "x64")     == 0)
+			if (!streq(optarg, "generic")
+			 && !streq(optarg, "arm64")
+			 && !streq(optarg, "x64"))
 			{
-				pflag = strdup(optarg);
-				assert(pflag != NULL);
-			} else {
 				fprintf(stderr, "%s: invalid profile -- '%s'\n", argv0, optarg);
 				usage();
 			}
+			pflag = xstrdup(optarg);
 			break;
 		default:
 			usage();
@@ -111,27 +126,50 @@ main(int argc, char **argv)
 	if (argc > 1)
 		usage();
 	if (argc == 1) {
-		if (strcmp(argv[0], "clean") != 0) {
+		struct strs cmd = {0};
+
+		if (streq(argv[0], "clean")) {
+			strspushl(&cmd, "find", ".",
+				"(",
+					"-name", "totp",
+					"-or", "-name", "totp-*",
+					"-or", "-name", "*.o",
+				")", "-delete"
+			);
+			CMDPRC(cmd);
+		} else if (streq(argv[0], "install")) {
+			char *bin, *man;
+			bin = mkoutpath("/bin");
+			man = mkoutpath("/share/man/man1");
+
+			strspushl(&cmd, "mkdir", "-p", bin, man);
+			CMDPRC(cmd);
+
+			char *stripprg = binexists(     "strip") ?      "strip"
+			               : binexists("llvm-strip") ? "llvm-strip"
+			               : NULL;
+			if (stripprg != NULL) {
+				strspushl(&cmd, stripprg, "--strip-all", "totp");
+				CMDPRC(cmd);
+			}
+
+			strspushl(&cmd, "cp", "totp", bin);
+			CMDPRC(cmd);
+			strspushl(&cmd, "cp", "totp.1", man);
+			CMDPRC(cmd);
+		} else {
 			fprintf(stderr, "%s: invalid subcommand -- '%s'\n", argv0, *argv);
 			usage();
 		}
-		struct strs cmd = {0};
-		strspushl(&cmd, "find", ".",
-			"(",
-				"-name", "totp",
-				"-or", "-name", "totp-*",
-				"-or", "-name", "*.o",
-			")", "-delete"
-		);
-		cmdput(cmd);
-		return cmdexec(cmd);
+
+		return EXIT_SUCCESS;
 	}
 
 	glob_t g;
-	assert(glob("src/*.c", 0, globerr, &g) == 0);
+	if (glob("src/*.c", 0, NULL, &g) != 0)
+		errx(1, "glob: failed to glob");
 
-	char *ext = malloc(strlen(pflag) + sizeof("-.c"));
-	assert(ext != NULL);
+	char *ext = xmalloc(strlen(pflag) + sizeof("-.c"));
 	sprintf(ext, "-%s.c", pflag);
 
 	for (size_t i = 0; i < g.gl_pathc; i++) {
@@ -144,7 +182,6 @@ main(int argc, char **argv)
 	}
 
 	globfree(&g);
-
 	ld();
 }
 
@@ -161,19 +198,19 @@ cc(void *arg)
 	strspush(&cmd, cflags_all, lengthof(cflags_all));
 	if (rflag)
 		strspushenv(&cmd, "CFLAGS", cflags_rls, lengthof(cflags_rls));
-	else {
+	else
 		strspushenv(&cmd, "CFLAGS", cflags_dbg, lengthof(cflags_dbg));
-		if (strstr(arg, "-x64.c") != NULL)
-			strspushl(&cmd, "-msha", "-mssse3");
-	}
+
+	if (strstr(arg, "-x64.c") != NULL)
+		strspushl(&cmd, "-msha", "-mssse3");
 	if (strstr(arg, "-arm64.c") != NULL)
 		strspushl(&cmd, "-march=native+crypto");
+
 	if (!Sflag)
 		strspushl(&cmd, "-fsanitize=address,undefined");
 	strspushl(&cmd, "-o", dst, "-c", src);
 
-	cmdput(cmd);
-	cmdexec(cmd);
+	CMDPRC(cmd);
 	strsfree(&cmd);
 out:
 	free(dst);
@@ -196,10 +233,9 @@ ld(void)
 		strspushl(&cmd, "-fsanitize=address,undefined");
 	strspushl(&cmd, "-o", oflag);
 
-	assert(glob("src/*.o", 0, globerr, &g) == 0);
+	assert(glob("src/*.o", 0, NULL, &g) == 0);
 
-	char *ext = malloc(strlen(pflag) + sizeof("-.o"));
-	assert(ext != NULL);
+	char *ext = xmalloc(strlen(pflag) + sizeof("-.o"));
 	sprintf(ext, "-%s.o", pflag);
 
 	for (size_t i = 0; i < g.gl_pathc; i++) {
@@ -213,18 +249,53 @@ ld(void)
 		strspushl(&cmd, g.gl_pathv[i]);
 	}
 
-	if (dobuild) {
-		cmdput(cmd);
-		cmdexec(cmd);
-	}
+	if (dobuild)
+		CMDPRC(cmd);
 
 	globfree(&g);
 	strsfree(&cmd);
 }
 
-int
-globerr(const char *s, int e)
+char *
+mkoutpath(const char *s)
 {
-	fprintf(stderr, "glob: %s: %s\n", s, strerror(e));
-	exit(EXIT_FAILURE);
+	char *p, *buf;
+
+	buf = xmalloc(PATH_MAX);
+	buf[0] = 0;
+
+	if (p = getenv("DESTDIR"), p && *p) {
+		if (strlcat(buf, p, PATH_MAX) >= PATH_MAX)
+			goto toolong;
+	}
+
+	p = getenv("PREFIX");
+	if (strlcat(buf, p && *p ? p : PREFIX, PATH_MAX) >= PATH_MAX)
+		goto toolong;
+	if (strlcat(buf, s, PATH_MAX) >= PATH_MAX)
+		goto toolong;
+
+	return buf;
+
+toolong:
+	errno = ENAMETOOLONG;
+	err(1, "$DESTDIR/$PREFIX");
+}
+
+void *
+xmalloc(size_t n)
+{
+	void *p = malloc(n);
+	if (p == NULL)
+		err(1, "malloc");
+	return p;
+}
+
+char *
+xstrdup(const char *s)
+{
+	char *p = strdup(s);
+	if (p == NULL)
+		err(1, "strdup");
+	return p;
 }
