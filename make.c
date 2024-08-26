@@ -50,7 +50,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	        "Usage: %s [-p generic|x64] [-fSr]\n"
+	        "Usage: %s [-p generic|arm64|x64] [-fSr]\n"
 	        "       %s clean\n",
 	        argv0, argv0);
 	exit(EXIT_FAILURE);
@@ -90,7 +90,10 @@ main(int argc, char **argv)
 			assert(oflag != NULL);
 			break;
 		case 'p':
-			if (strcmp(optarg, "generic") == 0 || strcmp(optarg, "x64") == 0) {
+			if (strcmp(optarg, "generic") == 0
+			 || strcmp(optarg, "arm64")   == 0
+			 || strcmp(optarg, "x64")     == 0)
+			{
 				pflag = strdup(optarg);
 				assert(pflag != NULL);
 			} else {
@@ -164,6 +167,8 @@ cc(void *arg)
 		if (strstr(arg, "-x64.c") != NULL)
 			strspushl(&cmd, "-msha", "-mssse3");
 	}
+	if (strstr(arg, "-arm64.c") != NULL)
+		strspushl(&cmd, "-march=native+crypto");
 	if (!Sflag)
 		strspushl(&cmd, "-fsanitize=address,undefined");
 	strspushl(&cmd, "-o", dst, "-c", src);
