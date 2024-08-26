@@ -29,11 +29,9 @@ sha1hashblk(sha1_t *s, const uint8_t *blk)
 
 	const __m128i *blkx = (const __m128i *)blk;
 
-	abcd = _mm_shuffle_epi32(_mm_loadu_si128((__m128i *)s->dgst), bswapdmsk);
-	e0 = _mm_set_epi32(s->dgst[4], 0, 0, 0);
-
-	abcd_save = abcd;
-	e_save = e0;
+	abcd_save = abcd =
+		_mm_shuffle_epi32(_mm_loadu_si128((__m128i *)s->dgst), bswapdmsk);
+	e_save = e0 = _mm_set_epi32(s->dgst[4], 0, 0, 0);
 
 	/* Rounds 0–3 */
 	msg0 = _mm_shuffle_epi8(_mm_loadu_si128(blkx + 0), bswapbmsk);
