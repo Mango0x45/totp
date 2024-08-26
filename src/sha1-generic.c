@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "common.h"
 #include "sha1.h"
 #include "xendian.h"
@@ -18,8 +20,11 @@ sha1hashblk(sha1_t *s, const uint8_t *blk)
 	uint32_t w[80];
 	uint32_t a, b, c, d, e, tmp;
 
-	for (int i = 0; i < 16; i++)
-		w[i] = htobe32(((uint32_t *)blk)[i]);
+	for (int i = 0; i < 16; i++) {
+		uint32_t n;
+		memcpy(&n, blk + i*sizeof(n), sizeof(n));
+		w[i] = htobe32(n);
+	}
 	for (int i = 16; i < 32; i++)
 		w[i] = rotl32(w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16], 1);
 	for (int i = 32; i < 80; i++)
