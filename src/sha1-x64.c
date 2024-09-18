@@ -24,7 +24,7 @@ sha1hashblk(sha1_t *s, const uint8_t *blk)
 #define bswapdmsk 0x1B  /* 0b00'01'10'11 */
 	const __m128i bswapbmsk = _mm_set_epi64x(
 		0x0001020304050607ULL,
-		0x08090a0b0c0d0e0fULL
+		0x08090A0B0C0D0E0FULL
 	);
 
 	const __m128i *blkx = (const __m128i *)blk;
