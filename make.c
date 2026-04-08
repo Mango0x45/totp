@@ -10,19 +10,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CBS_NO_THREADS
-#include "cbs.h"
+#define NOB_IMPLEMENTATION
+#include "nob.h"
 
 #define PREFIX "/usr/local"
 
 #define streq(x, y) (strcmp(x, y) == 0)
 #define CMDPRC(c)                                                              \
 	do {                                                                       \
-		int ec;                                                                \
-		cmdput(c);                                                             \
-		if ((ec = cmdexec(c)) != EXIT_SUCCESS)                                 \
-			errx(1, "%s terminated with exit-code %d", *c.buf, ec);            \
-		strszero(&c);                                                          \
+		if (!cmd_run_sync(c))                                              \
+			errx(EXIT_FAILURE, "%s terminated with an error", c.items[0]);     \
+		c.count = 0;                                                           \
 	} while (false)
 
 static void cc(void *);
@@ -30,28 +28,32 @@ static void ld(void);
 static char *mkoutpath(const char *);
 static char *xstrdup(const char *);
 static void *xmalloc(size_t);
+static char *swpext(const char *, const char *);
+static bool binexists(const char *);
+static void append_env_or_default(Nob_Cmd *, const char *,
+                                  const char **, size_t);
 
-static char *warnings[] = {
+static const char *warnings[] = {
 	"-Wall",
 	"-Wextra",
 	"-Wpedantic",
 	"-Wno-parentheses",
 };
 
-static char *cflags_all[] = {
+static const char *cflags_all[] = {
 	"-std=c11",
 #if __GLIBC__
 	"-D_GNU_SOURCE",
 #endif
 };
 
-static char *cflags_dbg[] = {
+static const char *cflags_dbg[] = {
 	"-g3",
 	"-ggdb3",
 	"-O0",
 };
 
-static char *cflags_rls[] = {
+static const char *cflags_rls[] = {
 	"-DNDEBUG=1",
 	"-flto",
 	"-march=native",
@@ -76,18 +78,17 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	cbsinit(argc, argv);
-	rebuild();
+	GO_REBUILD_URSELF(argc, argv);
 
 	argv0 = basename(argv[0]);
 
 	int opt;
 	static const struct option longopts[] = {
-		{"force",        no_argument,       0, 'f'},
-		{"no-sanitizer", no_argument,       0, 'S'},
-		{"output",       required_argument, 0, 'o'},
-		{"profile",      required_argument, 0, 'p'},
-		{"release",      no_argument,       0, 'r'},
+		{"force",		 no_argument,		0, 'f'},
+		{"no-sanitizer", no_argument,		0, 'S'},
+		{"output",		 required_argument, 0, 'o'},
+		{"profile",		 required_argument, 0, 'p'},
+		{"release",		 no_argument,		0, 'r'},
 		{0},
 	};
 
@@ -126,10 +127,10 @@ main(int argc, char **argv)
 	if (argc > 1)
 		usage();
 	if (argc == 1) {
-		struct strs cmd = {0};
+		Nob_Cmd cmd = {0};
 
 		if (streq(argv[0], "clean")) {
-			strspushl(&cmd, "find", ".",
+			cmd_append(&cmd, "find", ".",
 				"(",
 					"-name", "totp",
 					"-or", "-name", "totp-*",
@@ -142,32 +143,36 @@ main(int argc, char **argv)
 			bin = mkoutpath("/bin");
 			man = mkoutpath("/share/man/man1");
 
-			strspushl(&cmd, "mkdir", "-p", bin, man);
+			cmd_append(&cmd, "mkdir", "-p", bin, man);
 			CMDPRC(cmd);
 
-			char *stripprg = binexists(     "strip") ?      "strip"
-			               : binexists("llvm-strip") ? "llvm-strip"
-			               : NULL;
+			const char *stripprg = binexists("strip") ? "strip"
+			                     : binexists("llvm-strip") ? "llvm-strip"
+			                     : NULL;
 			if (stripprg != NULL) {
-				strspushl(&cmd, stripprg, "--strip-all", "totp");
+				cmd_append(&cmd, stripprg, "--strip-all", "totp");
 				CMDPRC(cmd);
 			}
 
-			strspushl(&cmd, "cp", "totp", bin);
+			cmd_append(&cmd, "cp", "totp", bin);
 			CMDPRC(cmd);
-			strspushl(&cmd, "cp", "totp.1", man);
+			cmd_append(&cmd, "cp", "totp.1", man);
 			CMDPRC(cmd);
+
+			free(bin);
+			free(man);
 		} else {
 			fprintf(stderr, "%s: invalid subcommand -- '%s'\n", argv0, *argv);
 			usage();
 		}
 
+		cmd_free(cmd);
 		return EXIT_SUCCESS;
 	}
 
 	glob_t g;
 	if (glob("src/*.c", 0, NULL, &g) != 0)
-		errx(1, "glob: failed to glob");
+		errx(EXIT_FAILURE, "glob: failed to glob");
 
 	char *ext = xmalloc(strlen(pflag) + sizeof("-.c"));
 	sprintf(ext, "-%s.c", pflag);
@@ -181,37 +186,48 @@ main(int argc, char **argv)
 		cc(g.gl_pathv[i]);
 	}
 
+	free(ext);
 	globfree(&g);
 	ld();
+
+	return EXIT_SUCCESS;
 }
 
-void
-cc(void *arg)
+void cc(void *arg)
 {
-	struct strs cmd = {0};
-	char *dst = swpext(arg, "o"), *src = arg;
+	Nob_Cmd cmd = {0};
+	char *src = arg;
+	char *dst = swpext(src, "o");
 
-	if (!fflag && fmdnewer(dst, src))
+	if (!fflag && !needs_rebuild1(dst, src))
 		goto out;
 
-	strspushenvl(&cmd, "CC", "cc");
-	strspush(&cmd, cflags_all, lengthof(cflags_all));
-	if (rflag)
-		strspushenv(&cmd, "CFLAGS", cflags_rls, lengthof(cflags_rls));
-	else
-		strspushenv(&cmd, "CFLAGS", cflags_dbg, lengthof(cflags_dbg));
+	const char *cc_env = getenv("CC");
+	cmd_append(&cmd, cc_env && *cc_env ? cc_env : "cc");
 
-	if (strstr(arg, "-x64.c") != NULL)
-		strspushl(&cmd, "-msha", "-mssse3");
-	if (strstr(arg, "-arm64.c") != NULL)
-		strspushl(&cmd, "-march=native+crypto");
+	for (size_t i = 0; i < ARRAY_LEN(cflags_all); i++)
+		cmd_append(&cmd, cflags_all[i]);
+
+	if (rflag) {
+		append_env_or_default(&cmd, "CFLAGS", cflags_rls,
+		                      ARRAY_LEN(cflags_rls));
+	} else {
+		append_env_or_default(&cmd, "CFLAGS", cflags_dbg,
+		                      ARRAY_LEN(cflags_dbg));
+	}
+
+	if (strstr(src, "-x64.c") != NULL)
+		cmd_append(&cmd, "-msha", "-mssse3");
+	if (strstr(src, "-arm64.c") != NULL)
+		cmd_append(&cmd, "-march=native+crypto");
 
 	if (!Sflag)
-		strspushl(&cmd, "-fsanitize=address,undefined");
-	strspushl(&cmd, "-o", dst, "-c", src);
+		cmd_append(&cmd, "-fsanitize=address,undefined");
+
+	cmd_append(&cmd, "-o", dst, "-c", src);
 
 	CMDPRC(cmd);
-	strsfree(&cmd);
+	cmd_free(cmd);
 out:
 	free(dst);
 }
@@ -221,17 +237,26 @@ ld(void)
 {
 	glob_t g;
 	bool dobuild = fflag;
-	struct strs cmd = {0};
+	Nob_Cmd cmd = {0};
 
-	strspushenvl(&cmd, "CC", "cc");
-	strspush(&cmd, cflags_all, lengthof(cflags_all));
-	if (rflag)
-		strspushenv(&cmd, "CFLAGS", cflags_rls, lengthof(cflags_rls));
-	else
-		strspushenv(&cmd, "CFLAGS", cflags_dbg, lengthof(cflags_dbg));
+	const char *cc_env = getenv("CC");
+	cmd_append(&cmd, cc_env && *cc_env ? cc_env : "cc");
+
+	for (size_t i = 0; i < ARRAY_LEN(cflags_all); i++)
+		cmd_append(&cmd, cflags_all[i]);
+
+	if (rflag) {
+		append_env_or_default(&cmd, "CFLAGS", cflags_rls,
+		                      ARRAY_LEN(cflags_rls));
+	} else {
+		append_env_or_default(&cmd, "CFLAGS", cflags_dbg,
+		                      ARRAY_LEN(cflags_dbg));
+	}
+
 	if (!Sflag)
-		strspushl(&cmd, "-fsanitize=address,undefined");
-	strspushl(&cmd, "-o", oflag);
+		cmd_append(&cmd, "-fsanitize=address,undefined");
+
+	cmd_append(&cmd, "-o", oflag);
 
 	assert(glob("src/*.o", 0, NULL, &g) == 0);
 
@@ -244,42 +269,71 @@ ld(void)
 		{
 			continue;
 		}
-		if (fmdolder("totp", g.gl_pathv[i]))
+		if (needs_rebuild1(oflag, g.gl_pathv[i]))
 			dobuild = true;
-		strspushl(&cmd, g.gl_pathv[i]);
+
+		cmd_append(&cmd, g.gl_pathv[i]);
 	}
 
 	if (dobuild)
 		CMDPRC(cmd);
 
+	free(ext);
 	globfree(&g);
-	strsfree(&cmd);
+	cmd_free(cmd);
 }
 
 char *
 mkoutpath(const char *s)
 {
-	char *p, *buf;
+	Nob_String_Builder sb = {0};
 
-	buf = xmalloc(PATH_MAX);
-	buf[0] = 0;
+	const char *destdir = getenv("DESTDIR");
+	if (destdir && *destdir)
+		sb_append_cstr(&sb, destdir);
 
-	if (p = getenv("DESTDIR"), p && *p) {
-		if (strlcat(buf, p, PATH_MAX) >= PATH_MAX)
-			goto toolong;
-	}
+	const char *prefix = getenv("PREFIX");
+	sb_append_cstr(&sb, prefix && *prefix ? prefix : PREFIX);
+	sb_append_cstr(&sb, s);
+	sb_append_null(&sb);
 
-	p = getenv("PREFIX");
-	if (strlcat(buf, p && *p ? p : PREFIX, PATH_MAX) >= PATH_MAX)
-		goto toolong;
-	if (strlcat(buf, s, PATH_MAX) >= PATH_MAX)
-		goto toolong;
+	char *res = xstrdup(sb.items);
+	sb_free(sb);
+	return res;
+}
 
-	return buf;
+char *
+swpext(const char *path, const char *ext)
+{
+	Nob_String_Builder sb = {0};
+	const char *dot = strrchr(path, '.');
 
-toolong:
-	errno = ENAMETOOLONG;
-	err(1, "$DESTDIR/$PREFIX");
+	if (!dot)
+		sb_append_cstr(&sb, path);
+	else
+		sb_append_buf(&sb, path, dot - path);
+
+	sb_append_cstr(&sb, ".");
+	sb_append_cstr(&sb, ext);
+	sb_append_null(&sb);
+
+	char *res = xstrdup(sb.items);
+	sb_free(sb);
+	return res;
+}
+
+bool
+binexists(const char *prg)
+{
+	Nob_String_Builder sb = {0};
+	sb_append_cstr(&sb, "command -v ");
+	sb_append_cstr(&sb, prg);
+	sb_append_cstr(&sb, " >/dev/null 2>&1");
+	sb_append_null(&sb);
+
+	bool exists = (system(sb.items) == 0);
+	sb_free(sb);
+	return exists;
 }
 
 void *
@@ -287,7 +341,7 @@ xmalloc(size_t n)
 {
 	void *p = malloc(n);
 	if (p == NULL)
-		err(1, "malloc");
+		err(EXIT_FAILURE, "malloc");
 	return p;
 }
 
@@ -296,6 +350,25 @@ xstrdup(const char *s)
 {
 	char *p = strdup(s);
 	if (p == NULL)
-		err(1, "strdup");
+		err(EXIT_FAILURE, "strdup");
 	return p;
+}
+
+void
+append_env_or_default(Nob_Cmd *cmd, const char *ev,
+                      const char **defs, size_t ndefs)
+{
+	const char *val = getenv(ev);
+	if (val && *val) {
+		char *val_copy = xstrdup(val);
+		char *p = strtok(val_copy, " \t");
+		while (p) {
+			cmd_append(cmd, xstrdup(p));
+			p = strtok(NULL, " \t");
+		}
+		free(val_copy);
+	} else {
+		for (size_t i = 0; i < ndefs; i++)
+			cmd_append(cmd, defs[i]);
+	}
 }
