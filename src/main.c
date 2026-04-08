@@ -48,6 +48,14 @@ main(int argc, char **argv)
 		{0},
 	};
 
+#if __OpenBSD__
+	if (unveil(NULL, NULL) == -1)
+		err(EXIT_FAILURE, "unveil");
+	/* exec for -h */
+	if (pledge("exec stdio", NULL) == -1)
+		err(EXIT_FAILURE, "pledge");
+#endif
+
 	argv[0] = basename(argv[0]);
 	while ((opt = getopt_long(argc, argv, "d:hp:", longopts, NULL)) != -1) {
 		switch (opt) {
@@ -88,6 +96,11 @@ main(int argc, char **argv)
 			usage(argv[0]);
 		}
 	}
+
+#if __OpenBSD__
+	if (pledge("stdio", NULL) == -1)
+		err(EXIT_FAILURE, "pledge");
+#endif
 
 	argc -= optind;
 	argv += optind;
