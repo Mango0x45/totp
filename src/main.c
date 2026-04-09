@@ -67,14 +67,14 @@ main(int argc, char **argv)
 			   ‘+’/‘-’.  We don’t want that, so assert that the input
 			   begins with a number. */
 			if (!xisdigit(optarg[0]))
-				errx(1, "%s: Invalid integer", optarg);
+				errx(1, "%s: invalid integer", optarg);
 
 			char *endptr;
 			long n = strtol(optarg, &endptr, 10);
 
 			/* There are trailing invalid digits */
 			if (*endptr != 0)
-				errx(1, "%s: Invalid integer", optarg);
+				errx(1, "%s: invalid integer", optarg);
 
 			/* The number was too large.  We asserted that the input
 			   didn’t start with ‘-’ so we can ignore checking for
@@ -85,7 +85,7 @@ main(int argc, char **argv)
 			}
 
 			if (n == 0)
-				errx(1, "%s: Integer must be non-zero", optarg);
+				errx(1, "%s: integer must be non-zero", optarg);
 			if (opt == 'd')
 				digits = (int)n;
 			else
@@ -135,7 +135,7 @@ process(const char *s, size_t n)
 	while (n > 0 && s[n - 1] == '=')
 		n--;
 	if (n == 0)
-		errx(1, "Empty Base32 input");
+		errx(1, "empty base32 input");
 
 	static uint8_t _key[256];
 	uint8_t *key = _key;
@@ -147,7 +147,7 @@ process(const char *s, size_t n)
 	}
 
 	if (!b32toa(key, s, n))
-		errx(1, "%s: Invalid Base32 input", s);
+		errx(1, "%s: invalid base32 input", s);
 
 	/* time(2) claims that this call will never fail if passed a NULL
 	   argument.  We cast the time_t to uint64_t which will always be
